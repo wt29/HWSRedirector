@@ -1,7 +1,7 @@
 Hot Water System Redirector
 
 Uses a 240V 30A contactor (with 12V triggering) to switch a resistive HWS into direct connection to the exported (from solar) grid. My
-basic reason for this is - Heat Pumps are great but are machanical, expensive and will eventually wear out. A resistive HWS coupled with and 
+basic reason for this is - Heat Pumps are great but are mechanical, expensive and will eventually wear out. A resistive HWS coupled with and 
 decent sized solar array should be a better fit for a large number of homes.
 
 This sketch uses an API to read from a power monitoring system - I use an IOTAWATT however I'm also planning a "Shelly EM" interface as well
