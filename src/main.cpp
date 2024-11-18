@@ -28,11 +28,15 @@
   #define LOCAL_SSID "Your SSID"                                // How many you have defined
   #define LOCAL_PASSWD "Your local password"
 
-  // API call to get grid value - sample Iotawatt shown
+  // API call to get grid value - sample Iotawatt shown - YMMV
   #define IW_GRID "http://192.168.1.100/query?select=[time.local.iso,Mains.Watts]&begin=m-1m&end=m&group=m&format=csv"
 
   #define WATTS_ENOUGH  -2200                       //When there are enough export watts to trigger the contactor
-  #define WAIT_TIME     300                            // How long to wait until trigger in seconds - stops the contactor from cycling
+  #define WAIT_TIME     300000                         // How long to wait until trigger in seconds - stops the contactor from cycling
+
+  #define EMONCMS                              // You are logging to EMONCMS
+  #define HOST       "Your EMONCMS HOST"       // Not required if not logging
+  #define APIKEY     "Your EMONCMS API Key"    // Not required if not logging
    -------------------------------------
 
 */
@@ -91,14 +95,19 @@ int wait_time;
 int contactorPin = 10;                  // A relay or MOSFET to trigger the contactor - its likely to be 12V
 bool contactorStatus = LOW;
 
+#ifdef EMONCMS
+const char* host = HOST;
+const char* APIKEY = MYAPIKEY;
+#endif
+
 const uint32_t waitForWiFi = 5000 ;         // How long to wait for the WiFi to connect - 5 Seconds should be enough
 int startWiFi;
 
-int connectMillis = millis();     // this gets reset after every successful data push
+int connectMillis = millis();               // this gets reset after every successful data push
 
 long unsigned int lastRun = -WAIT_TIME;    // Force a run on boot. Includes connect to WiFi
-float elapsedMinutes = 0;               // How much "minutes" have passed
-unsigned int numberOfPolls = 0;             // Total # of polls since rebooted
+float elapsedMinutes = 0;                  // How much "minutes" have passed
+unsigned int numberOfPolls = 0;            // Total # of polls since rebooted
 
 const long utcOffsetInSeconds = 36000;       // Sydney is 10 hours ahead - you will have to readjust
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
@@ -202,8 +211,37 @@ void loop() {
         contactorStatus = LOW;
         digitalWrite( contactorPin, contactorStatus );
         Serial.print( "Contactor off at " + getInternetTime() );
-      }
+       }
+#ifdef EMONCMS       
+       Serial.printf("[Connecting to %s ... \n", host );
+      
+       if (client.connect(host, 80))     {
+        Serial.println("Connected]");
+        Serial.println("[Sending a request]");
 
+        String request  = "GET " ;
+            request += "/input/post?node=";
+            request += nodeName;
+            request += "&fulljson={\"HWSRedirector\":";
+            request += ( contactorStatus ? 1 : 0 ) ;
+            request += "}&apikey=";
+            request += APIKEY; 
+
+        Serial.println( request );
+        client.println( request );
+
+        Serial.println("[Response:]");
+
+        while (client.connected()) {
+         if (client.available()) {
+          String resp = "Null";
+          resp = client.readStringUntil('\n');  // See what the host responds with.
+          Serial.println( resp );
+
+        }
+#endif
+      } 
+     }
     }     // Connect WiFi
 
   }      // Millis Loop
