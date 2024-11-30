@@ -31,8 +31,8 @@
   // API call to get grid value - sample Iotawatt shown - YMMV
   #define IW_GRID "http://192.168.1.100/query?select=[time.local.iso,Mains.Watts]&begin=m-1m&end=m&group=m&format=csv"
 
-  #define WATTS_ENOUGH  -2200                       //When there are enough export watts to trigger the contactor
-  #define WAIT_TIME     300000                         // How long to wait until trigger in seconds - stops the contactor from cycling
+  #define WATTS_ENOUGH  -2200                  // When there are enough export watts to trigger the contactor
+  #define WAIT_TIME     300000                 // How long to wait until trigger in seconds - stops the contactor from cycling
 
   #define EMONCMS                              // You are logging to EMONCMS
   #define HOST       "Your EMONCMS HOST"       // Not required if not logging
@@ -40,7 +40,7 @@
    -------------------------------------
 
 */
-#define VERSION 0.1            // First Cut
+#define VERSION 0.2            // First Cut
 
 #define C3MINI
 
@@ -135,10 +135,11 @@ void setup()
 
   connectWiFi();        // This thing isn't any use without WiFi
 
-  pinMode( ledPin, OUTPUT );          // The C3 doesn't have an onboard LED
-  pinMode( contactorPin, OUTPUT );    // Trigger the contactor
+  pinMode( ledPin, OUTPUT );                  // The C3 V1 doesn't have an onboard LED
+  pinMode( contactorPin, OUTPUT );            // Setup the relay/contactor
+  digitalWrite( contactorPin, HIGH );         // Start with the (confusing) contactor open
 
-  if (MDNS.begin( nodeName )) {              // Start the mDNS responder for <nodeName>.local
+  if (MDNS.begin( nodeName )) {               // Start the mDNS responder for <nodeName>.local
     Serial.println("mDNS responder started");
   }
   else
@@ -202,16 +203,16 @@ void loop() {
        http.end();
 
        if (IW_grid < WATTS_ENOUGH) {      // When in export, the IW_GRID will be in negative
-        contactorStatus = HIGH;
-        digitalWrite( contactorPin, contactorStatus );
+        contactorStatus = LOW;            // Relay is energised on LOW signal
         Serial.print( "Contactor on at " + getInternetTime() );
        }
        else
        {
-        contactorStatus = LOW;
-        digitalWrite( contactorPin, contactorStatus );
+        contactorStatus = HIGH;           // Default position
         Serial.print( "Contactor off at " + getInternetTime() );
        }
+       digitalWrite( contactorPin, contactorStatus );    // confusing because the relay is energised on a low signal
+
 #ifdef EMONCMS       
        Serial.printf("[Connecting to %s ... \n", host );
       
