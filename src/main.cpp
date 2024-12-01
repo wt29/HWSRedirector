@@ -6,7 +6,7 @@
   This is designed to switch a resistive How Water System into grid power once a 
   local solar is exporting sufficient power.
 
-  It utilises a 240V 30A contactor, with a 12V trigger to connect the HWS to the main/grid circuit.
+  It utilises a 240V 25A contactor, with a 12V trigger to connect the HWS to the main/grid circuit.
 
   I uses a "Shelly EM" or and Iotawatt as the sense circuit and reads the local API for grid values
 
@@ -29,15 +29,17 @@
   #define LOCAL_PASSWD "Your local password"
 
   // API call to get grid value - sample Iotawatt shown - YMMV
-  #define IW_GRID "http://192.168.1.100/query?select=[time.local.iso,Mains.Watts]&begin=m-1m&end=m&group=m&format=csv"
-
+  
   #define WATTS_ENOUGH  -2200                  // When there are enough export watts to trigger the contactor
   #define WAIT_TIME     300000                 // How long to wait until trigger in seconds - stops the contactor from cycling
 
   #define EMONCMS                              // You are logging to EMONCMS
   #define HOST       "Your EMONCMS HOST"       // Not required if not logging
   #define APIKEY     "Your EMONCMS API Key"    // Not required if not logging
-   -------------------------------------
+
+  #define SHELLY                               // Using the Shelly EM and API
+  #define API_CALL "http://192.168.1.100/query?select=[time.local.iso,Mains.Watts]&begin=m-1m&end=m&group=m&format=csv"
+ -------------------------------------
 
 */
 #define VERSION 0.2            // First Cut
@@ -89,9 +91,8 @@ bool connectWiFi();
 void handleRebootDevice();
 String getInternetTime();
 
-int IW_grid;
-int watts_enough;
-int wait_time;
+int gridWatts;
+int wattsEnough;
 int contactorPin = 10;                  // A relay or MOSFET to trigger the contactor - its likely to be 12V
 bool contactorStatus = LOW;
 
@@ -100,16 +101,14 @@ const char* host = HOST;
 const char* APIKEY = MYAPIKEY;
 #endif
 
-const uint32_t waitForWiFi = 5000 ;         // How long to wait for the WiFi to connect - 5 Seconds should be enough
+const uint32_t waitForWiFi = 5000 ;        // How long to wait for the WiFi to connect - 5 Seconds should be enough
 int startWiFi;
 
-int connectMillis = millis();               // this gets reset after every successful data push
+int connectMillis = millis();              // this gets reset after every successful data push
 
 long unsigned int lastRun = -WAIT_TIME;    // Force a run on boot. Includes connect to WiFi
-float elapsedMinutes = 0;                  // How much "minutes" have passed
-unsigned int numberOfPolls = 0;            // Total # of polls since rebooted
 
-const long utcOffsetInSeconds = 36000;       // Sydney is 10 hours ahead - you will have to readjust
+const long utcOffsetInSeconds = 36000;      // Sydney is 10 hours ahead - you will have to readjust
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 // Define NTP Client to get time
@@ -170,8 +169,7 @@ void loop() {
   ArduinoOTA.handle();
   if ( millis() > lastRun + WAIT_TIME )   {       // only want this happening every 5 minutes (or so) 
     lastRun = millis();                           // don't want to add Wifi Connection latency to the poll
-    numberOfPolls += 1;                           // Another poll recorded
-
+   
     Serial.println();
     Serial.print("Free Heap : ");
     Serial.println(ESP.getFreeHeap());
@@ -185,14 +183,21 @@ void loop() {
       int httpResponseCode = http.GET();
       
       if (httpResponseCode>0) {
-        Serial.print("IotaWatt HTTP Response code: ");
+        Serial.print("API HTTP Response code: ");
         Serial.println(httpResponseCode);
 
-        String IW_payload = http.getString();
-        IW_grid = IW_payload.substring(IW_payload.indexOf(',')+ 1).toInt();
+        String API_payload = http.getString();
+#ifndef SHELLY        
+        gridWatts = API_payload.substring(API_payload.indexOf(',')+ 1).toInt();
+#else        
+        // Required bits to extract Shelly GRID payload.
+        // This is a sample Shelly EM outpu
+        // String API_payload = "{\"power\":-3000.76,\"reactive\":105.32,\"pf\":-0.49,\"voltage\":247.49,\"is_valid\":true,\"total\":323084.2,\"total_returned\":2311187.4}";
 
+        gridWatts = API_payload.substring(API_payload.indexOf(':')+ 1).toInt();
+#endif
         Serial.print("Grid Value: ");
-        Serial.println(IW_grid);
+        Serial.println(gridWatts);
        }
        else 
        {
@@ -202,7 +207,7 @@ void loop() {
       // Free resources
        http.end();
 
-       if (IW_grid < WATTS_ENOUGH) {      // When in export, the IW_GRID will be in negative
+       if (gridWatts < WATTS_ENOUGH) {      // When in export, the IW_GRID will be in negative
         contactorStatus = LOW;            // Relay is energised on LOW signal
         Serial.print( "Contactor on at " + getInternetTime() );
        }
@@ -224,7 +229,7 @@ void loop() {
             request += "/input/post?node=";
             request += nodeName;
             request += "&fulljson={\"HWSRedirector\":";
-            request += ( contactorStatus ? 1 : 0 ) ;
+            request += ( contactorStatus ? 0 : 1 ) ;    // Reverse logic again
             request += "}&apikey=";
             request += APIKEY; 
 
@@ -244,9 +249,7 @@ void loop() {
       } 
      }
     }     // Connect WiFi
-
   }      // Millis Loop
-
 }       // Loop
 
 boolean connectWiFi() {
@@ -255,10 +258,10 @@ int start = millis();
 if ( WiFi.status() == WL_CONNECTED) {            // No point doing this if connected
  return true;
 }
-else                                             // Attempt
+else                                 // Attempt
 { 
- WiFi.mode(WIFI_STA);  // Station Mode
- WiFi.hostname( nodeName );     // This will show up in your DHCP server
+ WiFi.mode(WIFI_STA);               // Station Mode
+ WiFi.hostname( nodeName );         // This will show up in your DHCP server
  WiFi.disconnect();  
  WiFi.begin(LOCAL_SSID, LOCAL_PASSWD);
  
@@ -308,7 +311,7 @@ void handleRoot() {
   response += "<tr><td>Free Heap Space </td><td><b>" + String(ESP.getFreeHeap()) + " bytes</b></td></tr>";
   response += "<tr><td>Software Version</td><td><b>" + String(VERSION) + "</b></td></tr>";
   response += "<tr></tr>";
-  response += "<tr><td>Grid Value </td><td><b>" + String(IW_grid) + "</td></tr>";
+  response += "<tr><td>Grid Value </td><td><b>" + String(gridWatts) + "</td></tr>";
   response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "On" : "Off" ) ) + "</td></tr>";
   response += "</table>";
   server.send(200, "text/html", response );   // Send HTTP status 200 (Ok) and send some text to the browser/client

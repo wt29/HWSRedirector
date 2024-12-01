@@ -1,6 +1,6 @@
 # Hot Water System Redirector
 
-Uses a 240V 30A contactor (with 12V triggering) to switch a resistive HWS into direct connection to the exported (from solar) grid. My
+Uses a 240V 25A contactor (with 12V triggering) to switch a resistive HWS into direct connection to the exported (from solar) grid. My
 basic reason for this is - Heat Pumps are great but are mechanical, expensive and will eventually wear out. A resistive HWS coupled with and 
 decent sized solar array should be a better fit for a large number of homes  (IMHO)...
 
@@ -16,10 +16,11 @@ the power monitoring is available via Wifi (they aren't much use without it).
 
 I'll add some basic HW but I think you will need 
 
-1. 30A Contactor with 12V trigger
-2. 12V power supply - a wall wart would do
-3. Small DC-DC converter to provide 3.3 (or 5V) to the ESP
-4. A FET switch - these are about $AU10 on ebay
-5. Some sort of enclosure.
+1. A basic ESP32/8266 with WiFi (they all have them) - I used a Lolin C3 Mini but almost any thing would work. https://www.aliexpress.com/item/1005004740051202.html
+2. 25A Contactor with 12V trigger - I used a "Finder 22.32" with both NC and NO contacts
+3. 12V power supply - a 1A wall wart will do
+4. Small DC-DC converter to provide 5V to the ESP - https://core-electronics.com.au/dc-dc-adjustable-step-down-module-5a-75w.html  as an example
+5. An Arduino style relay - https://core-electronics.com.au/5v-single-channel-relay-module-10a.html
+6. Some sort of enclosure.
 
 Get a local sparky to hook up the contactor and expose the 12V terminals somewhere you can get to them outside the board. You may as well get them to install a local power point as well.
