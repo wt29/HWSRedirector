@@ -312,7 +312,7 @@ void handleRoot() {
   response += "<tr><td>Software Version</td><td><b>" + String(VERSION) + "</b></td></tr>";
   response += "<tr></tr>";
   response += "<tr><td>Grid Value </td><td><b>" + String(gridWatts) + "</td></tr>";
-  response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "On" : "Off" ) ) + "</td></tr>";
+  response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "Off" : "On" ) ) + "</td></tr>";
   response += "</table>";
   server.send(200, "text/html", response );   // Send HTTP status 200 (Ok) and send some text to the browser/client
 }

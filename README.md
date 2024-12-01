@@ -16,7 +16,7 @@ the power monitoring is available via Wifi (they aren't much use without it).
 
 I'll add some basic HW but I think you will need 
 
-1. A basic ESP32/8266 with WiFi (they all have them) - I used a Lolin C3 Mini but almost any thing would work. https://www.aliexpress.com/item/1005004740051202.html
+1. A basic ESP32/8266 with WiFi (they all have them) - I used a Lolin C3 Mini but almost any ESP thing would work. https://www.aliexpress.com/item/1005004740051202.html
 2. 25A Contactor with 12V trigger - I used a "Finder 22.32" with both NC and NO contacts
 3. 12V power supply - a 1A wall wart will do
 4. Small DC-DC converter to provide 5V to the ESP - https://core-electronics.com.au/dc-dc-adjustable-step-down-module-5a-75w.html  as an example
@@ -24,3 +24,7 @@ I'll add some basic HW but I think you will need
 6. Some sort of enclosure.
 
 Get a local sparky to hook up the contactor and expose the 12V terminals somewhere you can get to them outside the board. You may as well get them to install a local power point as well.
+
+The repo contains a Fusion (360) project and STL to build a mounting board for the 3 electronic board. There is also the KiCAD files for the (somewhat) basic circuit involved.
+
+
