@@ -294,7 +294,7 @@ else                                 // Attempt
 
 void handleRoot() {
   String response =  "<h2>You have reached the Hot Water System Redirector</h2>";
-  response += "<b>This device polls at approximately 1 minute intervals.</b>";
+  response += "<b>This triggers at " + String(WAIT_TIME/60000) + " minute intervals and when the export power value reaches " + String( abs( WATTS_ENOUGH ) ) + " Watts</b>";
   response += "<p></p><table style=\"width:600\">";
   response += "<tr><td>Current time </td><td><b>" + getInternetTime() + "</b></td></tr>";
   int runSecs = timeClient.getEpochTime() - startAbsoluteTime;
@@ -351,13 +351,13 @@ String fullDate ( unsigned long epoch ) {
   ntp_hour  = epoch % 24;
   epoch /= 24;
 
-  days_since_epoch = epoch;      //number of days since epoch
+  days_since_epoch = epoch;                       //number of days since epoch
   ntp_week_day = week_days[days_since_epoch % 7]; //Calculating WeekDay
 
-  ntp_year = 1970 + (days_since_epoch / 365); // ball parking year, may not be accurate!
+  ntp_year = 1970 + (days_since_epoch / 365);     // ball parking year, may not be accurate!
 
   unsigned int i;
-  for (i = 1972; i < ntp_year; i += 4) // Calculating number of leap days since epoch/1970
+  for (i = 1972; i < ntp_year; i += 4)            // Calculating number of leap days since epoch/1970
     if (((i % 4 == 0) && (i % 100 != 0)) || (i % 400 == 0)) leap_days++;
 
   ntp_year = 1970 + ((days_since_epoch - leap_days) / 365); // Calculating accurate current year by (days_since_epoch - extra leap days)
