@@ -4,3 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 src/data.h
+kicad/*.zip
+kicad/HWSRedirector-backups/HWSRedirector-2025-01-05_112625.zip
+kicad/HWSRedirector-backups/HWSRedirector-2025-01-05_165444.zip
+mount/Opener.stl
