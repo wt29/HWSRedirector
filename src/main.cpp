@@ -24,8 +24,8 @@
   #define C3MINI                                 // Just incase you want to use something else
   
   // Node and Network Setup
-  #define NODENAME "HWSRedirector"                  // eg "Kitchen"  Required and UNIQUE per site.  Also used to find mdns eg NODENAME.local
-  #define LOCAL_SSID "Your SSID"                                // How many you have defined
+  #define NODENAME "HWSRedirector"               // eg "Kitchen"  Required and UNIQUE per site.  Also used to find mdns eg NODENAME.local
+  #define LOCAL_SSID "Your SSID"                 // How many you have defined
   #define LOCAL_PASSWD "Your local password"
 
   // API call to get grid value - sample Iotawatt shown - YMMV
@@ -42,16 +42,14 @@
  -------------------------------------
 
 */
-#define VERSION 0.2            // First Cut
+#define VERSION 0.2             // First Cut
 
-#define C3MINI
+#define C3MINI                  // This shoule work on almost any ESP32 BUT.... you will need to check your pin mappings.
 
-#include <EEPROM.h>           // Going to save some the threshold value so it can be changed on the fly
-#define EEPROM_SIZE 32        // 4 bytes each for wattsEnough and may be some other
+#include <EEPROM.h>             // Going to save some the threshold value so it can be changed on the fly
+#define EEPROM_SIZE 32          // 4 bytes each for wattsEnough and may be some other
 
-//Node and Network Setup
-
-#ifdef C3MINI
+#ifdef C3MINI               
  #include <WiFi.h>
  #include <ESPmDNS.h>
 //# include <WebServer.h>
