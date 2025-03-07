@@ -5,6 +5,6 @@
 .vscode/ipch
 src/data.h
 kicad/*.zip
-kicad/HWSRedirector-backups
+kicad/HWSRedirector-backups/
 mount/Opener.stl
 
