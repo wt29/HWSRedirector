@@ -291,6 +291,7 @@ void loop() {
         // This is a sample Shelly EM output
         // String API_payload = "{\"power\":-3000.76,\"reactive\":105.32,\"pf\":-0.49,\"voltage\":247.49,\"is_valid\":true,\"total\":323084.2,\"total_returned\":2311187.4}";
         gridWatts = API_payload.substring(API_payload.indexOf(':')+ 1).toInt();
+
 #endif
         Serial.print("Grid Value: ");
         Serial.println(gridWatts);
