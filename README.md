@@ -1,8 +1,8 @@
 # Hot Water System Redirector
 
 Uses a 240V 25A contactor (with 12V triggering) to switch a resistive HWS into direct connection to the exported (from solar) grid. My
-basic reason for this is - Heat Pumps are great but are mechanical, expensive and will eventually wear out. A resistive HWS coupled with and 
-decent sized solar array should be a better fit for a large number of homes  (IMHO)...
+basic reason for this is - Heat Pumps are great for outright efficiency but are mechanical, expensive and will eventually wear out. A resistive HWS coupled with a 
+decent sized solar array should be a better fit for a large number of homes (IMHO)...
 
 This sketch uses an API to read from a power monitoring system - I use an IOTAWATT however it also has a "Shelly EM" interface as well.
 
@@ -23,10 +23,12 @@ Here is a basic BOM
 3. 12V power supply - a 1A wall wart will do the job fine.
 4. Small DC-DC converter to provide 5V to the ESP - https://core-electronics.com.au/dc-dc-adjustable-step-down-module-5a-75w.html  as an example
 5. An Arduino style relay - https://core-electronics.com.au/5v-single-channel-relay-module-10a.html
-6. Some sort of enclosure.
+6. Some sort of enclosure - this is only 12V and mounted outside the swithwoard so weather proofing is the main aim here.
 
 Get a local sparky to hook up the contactor and required isolators. They can also expose the 12V terminals somewhere you can get to them outside the board. You may as well get them to install a local power point as well.
 
-The repo contains a Fusion (360) project and STL to build a mounting board for the 3 electronic board. There is also the KiCAD files for the (somewhat) basic circuit involved.
+The repo contains a Fusion (360) project and STL to build a mounting board for the 3 electronic boards. There is also the KiCAD files for the (somewhat) basic circuit involved.
+
+This project is also under a bit of occasional development, mainly around getting a small UI on it.
 
 
