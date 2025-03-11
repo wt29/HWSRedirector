@@ -426,7 +426,7 @@ String handleRoot() {
   response += "<tr><td>Software Version</td><td><b>" + String(VERSION) + "</b></td></tr>";
   response += "<tr></tr>";
   response += "<tr><td>Grid Value </td><td><b>" + String(gridWatts) + "</td></tr>";
-  response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "On" : "Off" ) ) + "</td></tr>";
+  response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "Off" : "On" ) ) + "</td></tr>";
   response += "<tr><td>Current trigger value (in watts) </td><td><b>" + String( wattsEnough ) + "</b></td></tr>";  // this value is negative in the code but don't want to confuse users
   response += "<tr><td>    Current poll time in milliseconds </td><td><b>" + String( waitTime ) + "</b></td></tr>";
   response += "</table>";
