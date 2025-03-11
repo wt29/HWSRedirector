@@ -2,7 +2,7 @@
 
 Uses a 240V 25A contactor (with 12V triggering) to switch a resistive HWS into direct connection to the exported (from solar) grid. My
 basic reason for this is - Heat Pumps are great for outright efficiency but are mechanical, expensive and will eventually wear out. A resistive HWS coupled with a 
-decent sized solar array should be a better fit for a large number of homes (IMHO)...
+decent sized solar array should be a better fit for a many homes (IMHO) especially those with limited funds for HPHWS installation.
 
 This sketch uses an API to read from a power monitoring system - I use an IOTAWATT however it also has a "Shelly EM" interface as well.
 

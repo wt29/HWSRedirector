@@ -29,10 +29,7 @@
   #define LOCAL_PASSWD "Your local password"
 
   // API call to get grid value - sample Iotawatt shown - YMMV
-  
-  #define WATTS_ENOUGH  -2200                  // When there are enough export watts to trigger the contactor
-  #define WAIT_TIME     300000                 // How long to wait until trigger in seconds - stops the contactor from cycling
-
+    
   #define EMONCMS                              // You are logging to EMONCMS
   #define HOST       "Your EMONCMS HOST"       // Not required if not logging
   #define APIKEY     "Your EMONCMS API Key"    // Not required if not logging
@@ -40,6 +37,14 @@
   #define SHELLY                               // Using the Shelly EM and API
   #define API_CALL "http://192.168.1.100/query?select=[time.local.iso,Mains.Watts]&begin=m-1m&end=m&group=m&format=csv"
  -------------------------------------
+
+How to put C3 boards into Device Firmware Upgrade (DFU) mode.
+
+Hold on Button 9
+Press Button Reset
+Release Button 9 When you hear the prompt tone on usb reconnection
+
+IMPORTANT -> if you don't setup the C3 WiFI output power parameter.... It doesn't connect!
 
 */
 #define VERSION 0.2             // First Cut
@@ -52,6 +57,7 @@
 #ifdef C3MINI               
  #include <WiFi.h>
  #include <ESPmDNS.h>
+ #include <AsyncTCP.h>
 //# include <WebServer.h>
  # include <ESPAsyncWebServer.h>
 #else                            
@@ -85,38 +91,28 @@ WiFiClient client;                // Instance of WiFi Client
 String handleRoot();                // function prototypes for HTTP handlers
 void handleNotFound();            // Something it don't understand
 void rebootDevice();              // Kick it over remotely
-const char* PARAM_INPUT_1 = "watts";
-const char* PARAM_INPUT_2 = "seconds";
-
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html><head>
-  <title>ESP Input Form</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  </head><body>
-  <form action="/get">
-    input1: <input type="number" name="watts" value=2200 >
-    <input type="submit" value="Submit">
-  </form><br>
-  <form action="/get">
-    input2: <input type="number" name="seconds" value=300>
-    <input type="submit" value="Submit">
-  </form><br>
-  <form action="/get">
-    input3: <input type="text" name="input3">
-    <input type="submit" value="Submit">
-  </form>
-</body></html>)rawliteral";
-
 
 void millisDelay(long unsigned int);
 bool connectWiFi();
 String getInternetTime();
 
 int gridWatts;
-int wattsEnough = WATTS_ENOUGH;
-int contactorPin = 10;                  // A relay or MOSFET to trigger the contactor - its likely to be 12V
+
+int wattsEnough = -2200;          // Gets startup value, may not need once EEPROM code is OK
+int waitTime = 300000;            // This is in milliseconds so 300000 is 60 x 5 x 1000
+int contactorPin = 10;            // A relay or MOSFET to trigger the contactor - its likely to be 12V
 bool contactorStatus = LOW;
 
+const char* PARAM_INPUT_1 = "watts";
+const char* PARAM_INPUT_2 = "seconds";
+
+String inputWatts;
+String inputSeconds;
+String inputMessage;
+String inputParam;
+String inputMessage2;
+String inputParam2;
+    
 #ifdef EMONCMS
 const char* host = HOST;
 const char* APIKEY = MYAPIKEY;
@@ -127,7 +123,7 @@ int startWiFi;
 
 int connectMillis = millis();              // this gets reset after every successful data push
 
-long unsigned int lastRun = -WAIT_TIME;    // Force a run on boot. Includes connect to WiFi
+int lastRun ;             
 
 const long utcOffsetInSeconds = 36000;      // Sydney is 10 hours ahead - you will have to readjust
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
@@ -148,37 +144,41 @@ void notFound(AsyncWebServerRequest* request) {
   request->send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
 
-void rebootDevice(AsyncWebServerRequest* request) {
- // Serial.println( "In reboot Device" );
- // millisDelay( 5000 );
- // ESP.restart();
-  String html = "<h1>Rebooting " + String(nodeName) + " in 5 seconds</h1>";
-  request->send(200, "text/html", html );  // Warn them
-}
-
 //-----------------------------------------
 void setup()
 {
   
   Serial.begin(115200);     // baud rate
   millisDelay(1) ;          // allow the serial to init
-  Serial.println();         // clean up a little
+  Serial.println("--------Restart-------");         // clean up a little
   
-  int EEWatts;              // a temp
   EEPROM.begin(32);                 // this number in "begin()" is ESP8266. EEPROM is emulated so you need buffer to emulate.
-  EEWatts = EEPROM.read(0);            // Should read 4 bytes for each of these thangs
-  Serial.println(EEWatts);
-  if ( isnan( EEWatts ) ) { EEWatts = 0; }  // Having issues during devel with "nan" (not a number) being written to EEPROM
-  
-  if ( EEWatts > -10 ) {
-   EEWatts = WATTS_ENOUGH ;
-   EEPROM.write(0,EEWatts) ;
-   EEPROM.commit();
+
+  int EEWatts;
+  EEPROM.get(0, EEWatts );    // Should read 4 bytes for each of these thangs
+  if ( isnan( EEWatts ) ) { 
+    Serial.print("IsNan on wattsEnough");
+    EEWatts = wattsEnough;
+    EEPROM.put( 0, wattsEnough ) ;
+    EEPROM.commit();
   } 
+  Serial.print("Threshold watts from EEPROM:");
   Serial.println(EEWatts);
   wattsEnough = EEWatts;
   
-  connectWiFi();        // This thing isn't any use without WiFi
+  int EEWait;
+  EEPROM.get(4,EEWait);        // Should read 4 bytes for each of these thangs
+  if ( isnan( EEWait ) ) { 
+    Serial.print("IsNan on WaitTime");
+    EEWait = waitTime;               // Having issues during devel with "nan" (not a number) being written to EEPROM
+    EEPROM.put(4,waitTime) ;
+    EEPROM.commit();
+  } 
+  Serial.print("Threshold wait time from EEPROM:");
+  Serial.println(EEWait);
+  waitTime = EEWait;
+  
+  connectWiFi();                              // This thing isn't any use without WiFi
 
   pinMode( ledPin, OUTPUT );                  // The C3 V1 doesn't have an onboard LED
   pinMode( contactorPin, OUTPUT );            // Setup the relay/contactor
@@ -192,9 +192,9 @@ void setup()
     Serial.println("Error setting up MDNS responder!");
   }
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     Serial.println("ESP32 Web Server: New request received:");  // for debugging
-    Serial.println("GET /");                                    // for debugging
+    Serial.println("/");                                    // for debugging
 
     String html = handleRoot(); 
     request->send(200, "text/html", html );
@@ -202,43 +202,56 @@ void setup()
     }
   );
 
-  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
-  String inputWatts = String(wattsEnough);
-  String inputSeconds = String(WAIT_TIME);
-  String inputMessage;
-  String inputParam;
-    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
-  if (request->hasParam(PARAM_INPUT_1)) {
-     inputMessage = request->getParam(PARAM_INPUT_1)->value();
-     inputParam = PARAM_INPUT_1;
-     wattsEnough = inputMessage.toInt();
-     EEPROM.write(0, wattsEnough);
-     EEPROM.commit();
-   }
-    // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
-   else if (request->hasParam(PARAM_INPUT_2)) {
-     Serial.println("in 2nd Param");
-     inputMessage = request->getParam(PARAM_INPUT_2)->value();
-     inputParam = PARAM_INPUT_2;
-   }
-   else {
-//      inputWatts = "No change to Input Watts";
-  //    inputSeconds = "No change to timout seconds";
-      inputMessage = "No message";
-      inputParam = "None";
+  server.on("/ep", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    int W,S;
+    EEPROM.get(0,W);
+    EEPROM.get(4,S);
+    Serial.println( "EEpromRead0 " + String(W) );
+    Serial.println( "EEpromRead4 " + String(S) );
+    request->send(200, "text/html", "EEPROM 0 returns: " + String(W) + "<br> EEPROM 4 returns: " + String(S) +
+     "<br><br><a href=\"/\">Return to Home Page</a>");
+
     }
-    
-    Serial.println(inputMessage);
-    Serial.println(inputParam);
-    request->send(200, "text/html", "HTTP GET request sent to your ESP on input field (" 
-                                     + inputParam + ") with value: " + inputMessage +
-                                     "<br><br><a href=\"/\">Return to Home Page</a>");
-  });
+  );
+
+  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    Serial.println("ESP32 Web Server: New request received:");  // for debugging
+    Serial.println("/get");                                    // for debugging
+    inputWatts = String(wattsEnough);
+    inputSeconds = String(waitTime);
+    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
+    if (request->hasParam(PARAM_INPUT_1)) {
+      inputMessage = request->getParam(PARAM_INPUT_1)->value();
+      inputParam = PARAM_INPUT_1;
+      wattsEnough = inputMessage.toInt();
+      Serial.println("wattsEnough:" + wattsEnough );
+      
+      EEPROM.put(0, wattsEnough);
+      EEPROM.commit();
+      request->send(200, "text/html", "HTTP GET request sent to your ESP on input field (" 
+        + inputParam + ") with value: " + inputMessage +
+        "<br><br><a href=\"/\">Return to Home Page</a>");
+    }
+    // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
+    if (request->hasParam(PARAM_INPUT_2)) {
+      inputMessage2 = request->getParam(PARAM_INPUT_2)->value();
+      inputParam2 = PARAM_INPUT_2;
+      waitTime = inputMessage2.toInt();    // Need to get this up from millis
+      waitTime=waitTime*1000;
+      Serial.println("waitTime:" + String(waitTime) );
+
+      EEPROM.put(4, waitTime);
+      EEPROM.commit();
+      request->send(200, "text/html", "HTTP GET request sent to your ESP on input field (" 
+        + inputParam2 + ") with value: " + inputMessage2 +
+        "<br><br><a href=\"/\">Return to Home Page</a>");
+    }
+  }  
+);
   server.onNotFound( notFound );
   
-  server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest* request) {
-    // String html = "Rebooting in 5 seconds"; 
-    request->send(200, "text/html", "Rebooting in 5 seconds" );;
+  server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/html", "Rebooting in 5 seconds <br>After reboot, click <a href=\"/\">Return to Home Page</a>");
     Serial.println( "In reboot Device" );
     millisDelay( 5000 );
     ESP.restart();
@@ -255,15 +268,19 @@ void setup()
   startTime = getInternetTime();
   startAbsoluteTime = timeClient.getEpochTime();
 
+  lastRun -= waitTime;  // Should force a poll on startup
+
 }       // Setup
 
 //------------------------------------------------------
 
 void loop() {
 
-  // server.handleClient();                         // Listen for HTTP requests from clients
-  ArduinoOTA.handle();
-  if ( millis() > lastRun + WAIT_TIME )   {       // only want this happening every 5 minutes (or so) 
+  ArduinoOTA.handle();                            // Process updates
+  // Serial.println( "LastRun + waitTime:" + String( lastRun+waitTime ) );
+  // Serial.println( "Millis:" + String( millis() ) );
+  bool trigger =  ( millis() > lastRun + waitTime ) ;
+  if ( trigger )   {                                // only want this happening every 5 minutes (or so) 
     lastRun = millis();                           // don't want to add Wifi Connection latency to the poll
    
     Serial.println();
@@ -303,9 +320,11 @@ void loop() {
        }
       // Free resources
        http.end();
-
-       if (gridWatts < wattsEnough ) {      // When in export, the IW_GRID will be in negative
-        contactorStatus = LOW;            // Relay is energised on LOW signal
+       Serial.println( "Grid: " + String( gridWatts ));
+       Serial.println( "WattEnough * 1-: " + String( wattsEnough *-1 ));
+       if (gridWatts < (wattsEnough*-1) ) {   // When in export, grid watts will be in negative so we need the grid
+                                              // to be less (more negative) then 'wattsEnough'
+        contactorStatus = LOW;                // Relay is energised on LOW signal
         Serial.print( "Contactor on at " + getInternetTime() );
        }
        else
@@ -362,9 +381,11 @@ else                                 // Attempt
  WiFi.disconnect();  
  WiFi.begin(LOCAL_SSID, LOCAL_PASSWD);
  
+#ifdef C3MINI
  WiFi.setTxPower(WIFI_POWER_8_5dBm);   // This is a C3 thing
+#endif
 
- Serial.print("Connecting");
+Serial.print("Connecting");
  while ( millis() < start + 5000) {    // 5 seconds to connect 
  
    delay(500);
@@ -391,8 +412,8 @@ else                                 // Attempt
 
 String handleRoot() {
   String response =  "<h2>You have reached the Hot Water System Redirector</h2>";
-  response += "<b>This triggers at " + String(WAIT_TIME/60000) + " minute intervals and when the export power value reaches " + String( abs( WATTS_ENOUGH ) ) + " Watts</b>";
-  response += "<p></p><table style=\"width:600\">";
+  response += "<b>This triggers at " + String( waitTime/60000 ) + " minute intervals and when the export power value reaches " + String( abs( wattsEnough ) ) + " Watts</b>";
+  response += "<body><p></p><table style=\"width:600\">";
   response += "<tr><td>Current time </td><td><b>" + getInternetTime() + "</b></td></tr>";
   int runSecs = timeClient.getEpochTime() - startAbsoluteTime;
   int upDays = abs( runSecs / 86400 );
@@ -409,9 +430,9 @@ String handleRoot() {
   response += "<tr><td>Software Version</td><td><b>" + String(VERSION) + "</b></td></tr>";
   response += "<tr></tr>";
   response += "<tr><td>Grid Value </td><td><b>" + String(gridWatts) + "</td></tr>";
-  response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "Off" : "On" ) ) + "</td></tr>";
-  response += "<tr><td>Current trigger value (in watts)  </td><td><b>" + String(abs(wattsEnough)) + "</b></td></tr>";  // this value is negative in the code but don't want to confuse users
-  response += "<tr><td>Current poll time in seconds </td><td><b>" + String( WAIT_TIME / 1000 ) + "</b></td></tr>";
+  response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "On" : "Off" ) ) + "</td></tr>";
+  response += "<tr><td>Current trigger value (in watts) </td><td><b>" + String( wattsEnough ) + "</b></td></tr>";  // this value is negative in the code but don't want to confuse users
+  response += "<tr><td>    Current poll time in milliseconds </td><td><b>" + String( waitTime ) + "</b></td></tr>";
   response += "</table>";
   response += "<br>";
   response += "<form action=\"/get\">";
@@ -419,9 +440,10 @@ String handleRoot() {
   response += "<input type=\"submit\" value=\"Submit\">";
   response += "</form>";
   response += "<form action=\"/get\">";
-  response += "Poll time in seconds: <input type=\"text\" name=\"seconds\">";
+  response += " Poll time in seconds: <input type=\"text\" name=\"seconds\">";
   response += "<input type=\"submit\" value=\"Submit\">";
   response += "</form><br>";
+  response += "This server also responds to /reboot</body>";
   return response;
 }
 
