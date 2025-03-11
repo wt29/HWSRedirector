@@ -88,9 +88,8 @@ const char* nodeName = NODENAME;
 #endif
 WiFiClient client;                // Instance of WiFi Client
 
-String handleRoot();                // function prototypes for HTTP handlers
+String handleRoot();              // function prototypes for HTTP handlers
 void handleNotFound();            // Something it don't understand
-void rebootDevice();              // Kick it over remotely
 
 void millisDelay(long unsigned int);
 bool connectWiFi();
@@ -195,7 +194,6 @@ void setup()
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     Serial.println("ESP32 Web Server: New request received:");  // for debugging
     Serial.println("/");                                    // for debugging
-
     String html = handleRoot(); 
     request->send(200, "text/html", html );
     
@@ -252,7 +250,7 @@ void setup()
   
   server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/html", "Rebooting in 5 seconds <br>After reboot, click <a href=\"/\">Return to Home Page</a>");
-    Serial.println( "In reboot Device" );
+    Serial.println( "Rebooting....." );
     millisDelay( 5000 );
     ESP.restart();
 }
@@ -277,8 +275,7 @@ void setup()
 void loop() {
 
   ArduinoOTA.handle();                            // Process updates
-  // Serial.println( "LastRun + waitTime:" + String( lastRun+waitTime ) );
-  // Serial.println( "Millis:" + String( millis() ) );
+
   bool trigger =  ( millis() > lastRun + waitTime ) ;
   if ( trigger )   {                                // only want this happening every 5 minutes (or so) 
     lastRun = millis();                           // don't want to add Wifi Connection latency to the poll
@@ -320,7 +317,6 @@ void loop() {
        }
       // Free resources
        http.end();
-       Serial.println( "Grid: " + String( gridWatts ));
        Serial.println( "WattEnough * 1-: " + String( wattsEnough *-1 ));
        if (gridWatts < (wattsEnough*-1) ) {   // When in export, grid watts will be in negative so we need the grid
                                               // to be less (more negative) then 'wattsEnough'
@@ -371,22 +367,22 @@ void loop() {
 boolean connectWiFi() {
 int start = millis();  
  
-if ( WiFi.status() == WL_CONNECTED) {            // No point doing this if connected
+if ( WiFi.status() == WL_CONNECTED) {   // No point doing this if connected
  return true;
 }
-else                                 // Attempt
+else                                    // Attempt
 { 
- WiFi.mode(WIFI_STA);               // Station Mode
- WiFi.hostname( nodeName );         // This will show up in your DHCP server
+ WiFi.mode(WIFI_STA);                   // Station Mode
+ WiFi.hostname( nodeName );             // This will show up in your DHCP server
  WiFi.disconnect();  
  WiFi.begin(LOCAL_SSID, LOCAL_PASSWD);
  
 #ifdef C3MINI
- WiFi.setTxPower(WIFI_POWER_8_5dBm);   // This is a C3 thing
+ WiFi.setTxPower(WIFI_POWER_8_5dBm);    // This is a C3 thing
 #endif
 
 Serial.print("Connecting");
- while ( millis() < start + 5000) {    // 5 seconds to connect 
+ while ( millis() < start + 5000) {     // 5 seconds to connect 
  
    delay(500);
    Serial.print(".");
