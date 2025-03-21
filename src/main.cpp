@@ -96,6 +96,7 @@ bool connectWiFi();
 String getInternetTime();
 
 int gridWatts;
+int hwsWatts;
 
 int wattsEnough = -2200;          // Gets startup value, may not need once EEPROM code is OK
 int waitTime = 300000;            // This is in milliseconds so 300000 is 60 x 5 x 1000
@@ -286,46 +287,60 @@ void loop() {
 
     if ( connectWiFi() ) {;                        // Also just checks if Wifi is connected
     
-      String serverPath = IW_GRID;
-      http.begin(client,serverPath);
+      String gridPath = IW_GRID;
+      String hwsPath = IW_HWS;
+      
+      http.begin(client,gridPath);
       
       // Send HTTP GET request
-      int httpResponseCode = http.GET();
+      int httpResponseCode = http.GET();    // Check to see if API is responding
       
       if (httpResponseCode>0) {
         Serial.print("API HTTP Response code: ");
         Serial.println(httpResponseCode);
 
-        String API_payload = http.getString();
-#ifndef SHELLY    
-        // Iotawatt    
-        gridWatts = API_payload.substring(API_payload.indexOf(',')+ 1).toInt();
+        String API_GridPayload = http.getString();
+        http.end();
+
+        http.begin(client,hwsPath);
+        int httpResponseCode = http.GET();     // Check to see if API is responding
+        String API_HWSPayload = http.getString();
+        http.end();
+
+#ifndef SHELLY            // i.e. Iotawatt    
+        gridWatts = API_GridPayload.substring(API_GridPayload.indexOf(',')+ 1).toInt();
+        hwsWatts = API_HWSPayload.substring(API_HWSPayload.indexOf(',')+ 1).toInt();
 #else        
         // Required bits to extract Shelly GRID payload.
         // This is a sample Shelly EM output
         // String API_payload = "{\"power\":-3000.76,\"reactive\":105.32,\"pf\":-0.49,\"voltage\":247.49,\"is_valid\":true,\"total\":323084.2,\"total_returned\":2311187.4}";
         gridWatts = API_payload.substring(API_payload.indexOf(':')+ 1).toInt();
+        hwsWatts = API_payload.substring(API_payload.indexOf(':')+ 1).toInt();  // Needs to be adjusted
 
 #endif
         Serial.print("Grid Value: ");
         Serial.println(gridWatts);
-       }
+        Serial.print("HWS Value: ");
+        Serial.println( hwsWatts);
+}
        else 
        {
         Serial.print("Error code: ");
         Serial.println(httpResponseCode);
        }
-      // Free resources
-       http.end();
+
+
        Serial.println( "WattEnough * 1-: " + String( wattsEnough *-1 ));
-       if (gridWatts < (wattsEnough*-1) ) {   // When in export, grid watts will be in negative so we need the grid
-                                              // to be less (more negative) then 'wattsEnough'
+       
+       if ( ( (gridWatts + wattsEnough) < 0 ) | ( ( gridWatts + hwsWatts) < 0 ) ) {   // When in export, grid watts will be in negative so we need the grid
+                                                                                      // to be less (more negative) then 'wattsEnough' 
+                                                                                      // Need to check if the HWS is already on. In that case ANY export is enough
         contactorStatus = LOW;                // Relay is energised on LOW signal
         Serial.print( "Contactor on at " + getInternetTime() );
        }
        else
        {
-        contactorStatus = HIGH;           // Default position
+        contactorStatus = HIGH;           // Default position 
         Serial.print( "Contactor off at " + getInternetTime() );
        }
        digitalWrite( contactorPin, contactorStatus );    // confusing because the relay is energised on a low signal
@@ -342,6 +357,12 @@ void loop() {
             request += nodeName;
             request += "&fulljson={\"HWSRedirector\":";
             request += ( contactorStatus ? 0 : 1 ) ;    // Reverse logic again
+            request += ",\"Export\":" ;
+            request +=  gridWatts * -1;
+            request += ",\"WaitTime\":" ;
+            request += waitTime/1000 ;                  // Seconds is enough
+            request += ",\"Threshold\":" ;
+            request += wattsEnough ;
             request += "}&apikey=";
             request += APIKEY; 
 
@@ -425,7 +446,8 @@ String handleRoot() {
   response += "<tr><td>Free Heap Space </td><td><b>" + String(ESP.getFreeHeap()) + " bytes</b></td></tr>";
   response += "<tr><td>Software Version</td><td><b>" + String(VERSION) + "</b></td></tr>";
   response += "<tr></tr>";
-  response += "<tr><td>Grid Value </td><td><b>" + String(gridWatts) + "</td></tr>";
+  response += "<tr><td>Grid watts </td><td><b>" + String(gridWatts) + " Negative is EXPORT </td></tr>";
+  response += "<tr><td>HWS watts </td><td><b>" + String(hwsWatts) + "</td></tr>";
   response += "<tr><td>Contactor Status </td><td><b>" + String( (contactorStatus ? "Off" : "On" ) ) + "</td></tr>";
   response += "<tr><td>Current trigger value (in watts) </td><td><b>" + String( wattsEnough ) + "</b></td></tr>";  // this value is negative in the code but don't want to confuse users
   response += "<tr><td>    Current poll time in milliseconds </td><td><b>" + String( waitTime ) + "</b></td></tr>";
